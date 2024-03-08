@@ -18,10 +18,10 @@
 import random
 import requests
 from bs4 import BeautifulSoup
-
+import torch
 import langchain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 import chromadb
 from chromadb.utils import embedding_functions
 
@@ -30,13 +30,21 @@ from common.base.validator import BaseValidatorNeuron
 
 # SETUP VECTOR DATABASE for simple example of how a miner could work with incoming data
 chroma_client = chromadb.Client()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size = 200,
-    chunk_overlap  = 30,
+    chunk_size = 400,
+    chunk_overlap  = 60,
     length_function = len,
     is_separator_regex = False,
 )
-
+model_name = "BAAI/bge-large-en"
+model_kwargs = {'device': device}
+encode_kwargs = {'normalize_embeddings': True}
+embeddings = HuggingFaceBgeEmbeddings(
+    model_name=model_name,
+    model_kwargs=model_kwargs,
+    encode_kwargs=encode_kwargs
+)
 # receive the validator request, put the data into vectorDB, 
 # ... query VDB for prompt-relevant context, build citations, return 
 def get_relevant_context_and_citations_from_synapse(synapse: BaseValidatorNeuron) -> List:
@@ -84,6 +92,7 @@ def __index_data_from_datas(datas: List[dict]) -> Sequence:
             chunks = text_splitter.create_documents([context])
             docs = [c.page_content for c in chunks]
             collection.add(documents=docs, 
+				embeddings = embeddings,
                            ids=[f"id_data_{x}_{i}" for i in range(len(docs))],
                            metadatas=[{"source": source} for _ in range(len(docs))])
 
@@ -91,7 +100,5 @@ def __index_data_from_datas(datas: List[dict]) -> Sequence:
 
 # random hash for colleciton name
 def __generate_collection_name() -> str:
-    # countering the effect of setting seed for task orchestration from validators
-    random.seed(None)
     h = random.getrandbits(128)
     return f'bitagent.collection.{h}'
