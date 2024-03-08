@@ -29,7 +29,7 @@ def miner_init(self, config=None):
 
     def llm(input_text):
         input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
-        outputs = self.model.generate(input_ids, max_length=60)
+        outputs = self.model.generate(input_ids, max_length=100)
         result = self.tokenizer.decode(outputs[0])
         # response is typically: <pad> text</s>
         result = result.replace("<pad>","").replace("</s>","").strip()
